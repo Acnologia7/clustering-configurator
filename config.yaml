@@ -1,0 +1,7 @@
+clustering:
+  algorithm: "KMeans"
+  hyperparameters:
+    n_clusters: 3
+    random_state: 42
+  input_format: "json"
+  output_format: "json"
