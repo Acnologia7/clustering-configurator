@@ -1,0 +1,53 @@
+repos:
+  # Black: Auto-formatting
+  - repo: https://github.com/psf/black
+    rev: 23.9.1
+    hooks:
+      - id: black
+
+  # Flake8: Linting
+  - repo: https://github.com/PyCQA/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+
+  # Mypy: Type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.5.1
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          [
+            types-PyYAML==6.0.2,
+            dependency-injector==4.43.0,
+            scikit-learn==1.5.2,
+          ]
+
+  # End-of-file-fixer: Ensure consistent EOF
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: end-of-file-fixer
+
+  # Check YAML files
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-yaml
+
+  # Sort imports with isort
+  - repo: https://github.com/pre-commit/mirrors-isort
+    rev: v5.10.1
+    hooks:
+      - id: isort
+
+  # Run tests with pytest
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: python -m pytest tests
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
