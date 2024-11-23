@@ -21,6 +21,7 @@ repos:
             types-PyYAML==6.0.2,
             dependency-injector==4.43.0,
             scikit-learn==1.5.2,
+            pydantic==2.10.1,
           ]
 
   # End-of-file-fixer: Ensure consistent EOF
