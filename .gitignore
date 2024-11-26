@@ -166,3 +166,7 @@ input.json
 input.npy
 output.json
 output.npy
+sample_weight.json
+sample_weight.npy
+tconfig.yaml
+confgig.yaml
