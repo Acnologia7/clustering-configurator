@@ -1,259 +1,149 @@
 import json
-from typing import Optional, Union
+from abc import ABC, abstractmethod
+from typing import Optional
 
 import numpy as np
 from numpy import ndarray
 
 
-class JSONHandler:
+class BaseHandler(ABC):
     """
-    A handler for reading and writing data in JSON format.
+    Abstract base class for data handlers.
 
-    This class provides static methods to load data
-    from a JSON file and save data to a JSON file.
-    Data is converted between JSON format and NumPy arrays
-    for compatibility with numerical operations.
+    Subclasses must implement `load_data` and `save_data`.
 
     Methods:
-        load(filepath: str) -> Optional[ndarray]:
-            Load JSON data from a file and convert it to a NumPy array.
-
-        save(data: ndarray, filepath: str) -> None:
-            Save a NumPy array to a JSON file.
-
-    Example usage:
-        >>> json_handler = JSONHandler()
-        >>> data = json_handler.load('data.json')
-        >>> print(data)
-        [[1, 2, 3], [4, 5, 6]]
-        >>> json_handler.save(data, 'output')
+        load_data(filepath: str) -> Optional[ndarray]: Load data from a file.
+        save_data(data: ndarray, filepath: str) -> None: Save data to a file.
     """
 
-    @staticmethod
-    def load(filepath: str) -> Optional[ndarray]:
+    @abstractmethod
+    def load_data(self, filepath: str) -> Optional[ndarray]:
         """
-        Load data from a JSON file and return it as a NumPy array.
+        Load data from a file.
 
         Args:
-            filepath (str): Path to the JSON file to load.
+            filepath (str): Path to the file.
 
         Returns:
-            Optional[ndarray]: A NumPy array containing
-            the loaded data, or None if the file does not exist.
-
-        Raises:
-            FileNotFoundError: If the file does not exist.
-            Exception: For other issues while reading the file.
+            Optional[ndarray]: Loaded data as a NumPy array or None.
 
         Example:
-            >>> data = JSONHandler.load('data.json')
-            >>> print(data)
-            [[1, 2, 3], [4, 5, 6]]
+            >>> handler.load_data("data.json")
         """
-        try:
-            with open(filepath, "r") as file:
-                loaded_data = json.load(file)
-                data_array = np.array(loaded_data)
-        except FileNotFoundError:
-            print(f"File: {filepath} does not exist.")
-        except Exception as e:
-            raise e
+        pass
 
-        return data_array
-
-    @staticmethod
-    def save(data: ndarray, filepath: str) -> None:
+    @abstractmethod
+    def save_data(self, data: ndarray, filepath: str) -> None:
         """
-        Save a NumPy array to a JSON file.
+        Save data to a file.
 
         Args:
-            data (ndarray): The NumPy array to save.
-            filepath (str): The path where the JSON file
-            will be saved with extention '.json'.
-
-        Raises:
-            Exception: If there is an error while writing the file.
+            data (ndarray): Data to save.
+            filepath (str): Path to save the file.
 
         Example:
-            >>> data = np.array([[1, 2, 3], [4, 5, 6]])
-            >>> JSONHandler.save(data, 'output')
+            >>> handler.save_data(np.array([1, 2, 3]), "output.npy")
         """
-        try:
-            with open(f"{filepath}.json", "w") as file:
-                json.dump(data.tolist(), file)
-        except Exception as e:
-            raise e
+        pass
 
 
-class NumpyHandler:
+class JSONHandler(BaseHandler):
     """
-    A handler for reading and writing data in NumPy format (.npy).
-
-    This class provides static methods to load data
-    from a NumPy file and save data to a NumPy file.
-    It allows efficient storage and
-    retrieval of NumPy arrays in their native format.
+    Handler for JSON files.
 
     Methods:
-        load(filepath: str) -> Optional[ndarray]:
-            Load data from a NumPy file and return it as a NumPy array.
-
-        save(data: ndarray, filepath: str) -> None:
-            Save a NumPy array to a file in NumPy format.
-
-    Example usage:
-        >>> numpy_handler = NumpyHandler()
-        >>> data = numpy_handler.load('data.npy')
-        >>> print(data)
-        [[1, 2, 3], [4, 5, 6]]
-        >>> numpy_handler.save(data, 'output')
+        load_data(filepath: str) -> Optional[ndarray]: Load JSON data.
+        save_data(data: ndarray, filepath: str) -> None: Save data as JSON.
     """
-
-    @staticmethod
-    def load(filepath: str) -> Optional[ndarray]:
-        """
-        Load data from a NumPy file and return it as a NumPy array.
-
-        Args:
-            filepath (str): Path to the NumPy file to load.
-
-        Returns:
-            Optional[ndarray]: A NumPy array containing the loaded data,
-            or None if the file does not exist.
-
-        Raises:
-            FileNotFoundError: If the file does not exist.
-            Exception: For other issues while reading the file.
-
-        Example:
-            >>> data = NumpyHandler.load('data.npy')
-            >>> print(data)
-            [[1, 2, 3], [4, 5, 6]]
-        """
-        try:
-            data_array = np.load(filepath)
-        except FileNotFoundError:
-            print(f"File: {filepath} does not exist.")
-        except Exception as e:
-            raise e
-
-        return data_array
-
-    @staticmethod
-    def save(data: ndarray, filepath: str) -> None:
-        """
-        Save a NumPy array to a file in NumPy format.
-
-        Args:
-            data (ndarray): The NumPy array to save.
-            filepath (str): The path where
-            the NumPy file will be saved (without extension).
-
-        Raises:
-            Exception: If there is an error while writing the file.
-
-        Example:
-            >>> data = np.array([[1, 2, 3], [4, 5, 6]])
-            >>> NumpyHandler.save(data, 'output')
-        """
-        try:
-            np.save(f"{filepath}.npy", data)
-        except Exception as e:
-            raise e
-
-
-class IOHandler:
-    """
-    A utility class for loading and saving data using injected handlers.
-
-    This class serves to abstract
-    the details of file format handling by injecting
-    specific handlers (e.g., JSONHandler or NumpyHandler)
-    for input and output operations.
-
-    Attributes:
-        input_handler (Union[JSONHandler, NumpyHandler]):
-        The handler used for loading data.
-        output_handler (Union[JSONHandler, NumpyHandler]):
-        The handler used for saving data.
-
-    Methods:
-        load_data(filepath: str) -> Optional[ndarray]:
-            Load data using the input handler.
-
-        save_data(data: ndarray, filepath: str) -> None:
-            Save data using the output handler.
-
-    Example usage:
-        >>> input_handler = JSONHandler()
-        >>> output_handler = NumpyHandler()
-        >>> io_handler = IOHandler(input_handler, output_handler)
-        >>> data = io_handler.load_data('data.json')
-        >>> print(data)
-        [[1, 2, 3], [4, 5, 6]]
-        >>> io_handler.save_data(data, 'output')
-    """
-
-    def __init__(
-        self,
-        input_handler: Union[JSONHandler, NumpyHandler],
-        output_handler: Union[JSONHandler, NumpyHandler],
-    ) -> None:
-        """
-        Initialize the IOHandler with specified input and output handlers.
-
-        Args:
-            input_handler (Union[JSONHandler, NumpyHandler]):
-            The handler used for loading data.
-            output_handler (Union[JSONHandler, NumpyHandler]):
-            The handler used for saving data.
-        """
-        self.input_handler = input_handler
-        self.output_handler = output_handler
 
     def load_data(self, filepath: str) -> Optional[ndarray]:
         """
-        Load data using the injected input handler.
+        Load data from a JSON file.
 
         Args:
-            filepath (str): Path to the file to load.
+            filepath (str): Path to the JSON file.
 
         Returns:
-            Optional[ndarray]: A NumPy array containing the loaded data,
-            or None if the file does not exist.
-
-        Raises:
-            Exception: If there is an error during data loading.
+            Optional[ndarray]: Loaded data as a NumPy array or None.
 
         Example:
-            >>> io_handler = IOHandler(JSONHandler(), NumpyHandler())
-            >>> data = io_handler.load_data('data.json')
-            >>> print(data)
-            [[1, 2, 3], [4, 5, 6]]
+            >>> handler = JSONHandler()
+            >>> data = handler.load_data("data.json")
         """
         try:
-            return self.input_handler.load(filepath)
+            with open(filepath, "r") as file:
+                data = json.load(file)
+                return np.array(data)
+        except FileNotFoundError:
+            print(f"File: {filepath} does not exist.")
+            return None
         except Exception as e:
             raise e
 
     def save_data(self, data: ndarray, filepath: str) -> None:
         """
-        Save data using the injected output handler.
+        Save data to a JSON file.
 
         Args:
-            data (ndarray): The NumPy array to save.
-            filepath (str): The path where the file
-            will be saved (without extension).
-
-        Raises:
-            Exception: If there is an error during data saving.
+            data (ndarray): Data to save.
+            filepath (str): Path to save the JSON file.
 
         Example:
-            >>> io_handler = IOHandler(JSONHandler(), NumpyHandler())
-            >>> data = np.array([[1, 2, 3], [4, 5, 6]])
-            >>> io_handler.save_data(data, 'output')
+            >>> handler = JSONHandler()
+            >>> handler.save_data(np.array([1, 2, 3]), "output.json")
         """
         try:
-            self.output_handler.save(data, filepath)
+            with open(filepath, "w") as file:
+                json.dump(data.tolist(), file)
+        except Exception as e:
+            raise e
+
+
+class NumpyHandler(BaseHandler):
+    """
+    Handler for NumPy files (.npy).
+
+    Methods:
+        load_data(filepath: str) -> Optional[ndarray]: Load .npy data.
+        save_data(data: ndarray, filepath: str) -> None: Save data as .npy.
+    """
+
+    def load_data(self, filepath: str) -> Optional[ndarray]:
+        """
+        Load data from a NumPy file.
+
+        Args:
+            filepath (str): Path to the .npy file.
+
+        Returns:
+            Optional[ndarray]: Loaded data as a NumPy array or None.
+
+        Example:
+            >>> handler = NumpyHandler()
+            >>> data = handler.load_data("data.npy")
+        """
+        try:
+            return np.load(filepath)
+        except FileNotFoundError:
+            print(f"File: {filepath} does not exist.")
+            return None
+        except Exception as e:
+            raise e
+
+    def save_data(self, data: ndarray, filepath: str) -> None:
+        """
+        Save data to a NumPy file.
+
+        Args:
+            data (ndarray): Data to save.
+            filepath (str): Path to save the .npy file.
+
+        Example:
+            >>> handler = NumpyHandler()
+            >>> handler.save_data(np.array([1, 2, 3]), "output.npy")
+        """
+        try:
+            np.save(filepath, data)
         except Exception as e:
             raise e
