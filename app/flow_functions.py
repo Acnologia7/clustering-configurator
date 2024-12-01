@@ -1,33 +1,27 @@
 from argparse import ArgumentParser, Namespace
-from typing import Optional
+from typing import List, Optional, Union
 
 import yaml
 from numpy import ndarray
+from pydantic import ValidationError
 
-from app.dependencies import ClusteringContainer
-from app.utils.io_handler import IOHandler
+from app.clustering import CDBSCAN, CAgglomerativeClustering, CKMeans
+from app.utils.io_handler import JSONHandler, NumpyHandler
 from app.utils.validations import Config
 
 
 def parse_arguments() -> "Namespace":
     """
-    Parse command-line arguments for the clustering tool.
-
-    The function defines the required command-line arguments
-    for running the clustering workflow,
-    including paths for configuration, input data,
-    output file, and an optional sample weight file.
+    Parse command-line arguments for configuration, input, and output paths.
 
     Returns:
-        argparse.Namespace: Parsed command-line arguments.
+        Namespace: Parsed arguments including paths for
+        config, input, output, and sample weights.
 
-    Example Usage:
+    Example:
         ```python
         args = parse_arguments()
-        print(args.config)  # Path to the config file
-        print(args.input)   # Path to the input data file
-        print(args.output)  # Path to save output results
-        print(args.sample_weight)  # Optional sample weight file path
+        print(args.config)  # Path to config.yaml
         ```
     """
     parser = ArgumentParser(description="Data Clustering Tool")
@@ -35,92 +29,63 @@ def parse_arguments() -> "Namespace":
     parser.add_argument(
         "--input", required=True, help="Path to input data file"
     )
-    parser.add_argument(
-        "--output", required=True, help="Path to save clustered output"
-    )
-    parser.add_argument(
-        "--sample-weight",
-        help="Path to sample weight file for training (optional)",
-    )
+    parser.add_argument("--output", required=True, help="Path to save results")
+    parser.add_argument("--sample-weight", help="Optional sample weight file")
     return parser.parse_args()
 
 
 def load_and_validate_config(config_path: str) -> Config:
     """
-    Load and validate a configuration from a YAML file.
-
-    This function reads the YAML configuration file,
-    parses it into a dictionary,
-    and validates it against the `Config` schema.
+    Load and validate YAML configuration.
 
     Args:
-        config_path (str): Path to the YAML configuration file.
+        config_path (str): Path to the configuration file.
 
     Returns:
         Config: Validated configuration object.
 
     Raises:
-        Exception: If the configuration file is missing or invalid.
+        ValidationError: If the configuration is invalid.
 
-    Example Usage:
+    Example:
         ```python
         config = load_and_validate_config("config.yaml")
         print(config.clustering.algorithm)
-        # Access clustering algorithm details
         ```
     """
     try:
         with open(config_path, "r") as file:
             raw_config = yaml.safe_load(file)
-        validated_config = Config(**raw_config)
-        return validated_config
-    except Exception as e:
-        raise Exception(f"Configuration Validation Error: {e}")
+        return Config(**raw_config)
+    except ValidationError as e:
+        raise ValidationError(f"Invalid configuration: {e}")
 
 
 def load_data(
-    io_handler: IOHandler,
+    input_handler: Union[JSONHandler, NumpyHandler],
     input_path: str,
     sample_weight_path: Optional[str],
 ) -> tuple[Optional[ndarray], Optional[ndarray]]:
     """
-    Load input data and optional sample weights.
-
-    The function uses the provided IO handler to
-    load training data from the specified input path.
-    Optionally, it loads sample weight data if a weight file path is provided.
+    Load input data and optional sample weights using the given handler.
 
     Args:
-        io_handler (IOHandler): Instance of an IO handler for data loading.
-        input_path (str): Path to the input data file.
-        sample_weight_path (Optional[str]):
-        Path to the sample weight file (optional).
+        input_handler (Union[JSONHandler, NumpyHandler]): Handler to load data.
+        input_path (str): Path to input data file.
+        sample_weight_path (Optional[str]): Path to sample weight file.
 
     Returns:
-        tuple: A tuple containing:
-            - Optional[ndarray]:
-            Training data.
-            - Optional[ndarray]:
-            Sample weights, or None if no weight file is provided.
+        tuple: Loaded training data and sample weights.
 
-    Raises:
-        Exception:
-        If there is an error loading the input or sample weight data.
-
-    Example Usage:
+    Example:
         ```python
-        io_handler = IOHandler()
-        train_data, train_sample_weight = load_data(
-            io_handler, "input.json", "weights.json"
-        )
-        print(train_data)  # Loaded training data
-        print(train_sample_weight)  # Loaded sample weights
+        train_data, weights = load_data(handler, "data.json", "weights.json")
         ```
     """
     try:
-        train_data = io_handler.load_data(input_path)
+        train_data = input_handler.load_data(input_path)
         train_sample_weight = (
-            io_handler.load_data(sample_weight_path)
+            input_handler.load_data(sample_weight_path)
             if sample_weight_path
             else None
         )
@@ -130,127 +95,97 @@ def load_data(
 
 
 def validate_sample_weights(
-    train_data: ndarray, train_sample_weight: ndarray
+    train_data: ndarray, train_sample_weight: Optional[List[float]]
 ) -> None:
     """
-    Validate the length of
-    sample weights against the number of training data points.
-
-    Ensures that the number of
-    sample weights matches the number of training data points.
-    If there is a mismatch, raises a ValueError.
+    Ensure sample weights match the number of data points.
 
     Args:
-        train_data (ndarray): Training data array.
-        train_sample_weight (ndarray): Sample weight array.
-
-    Returns:
-        None: This function does not return any value.
+        train_data (ndarray): Training data.
+        train_sample_weight (Optional[List[float]]): Sample weights.
 
     Raises:
-        ValueError: If the number of rows in `train_sample_weight`
-        does not match the number of rows in `train_data`.
+        ValueError: If weights and data points mismatch.
 
-    Example Usage:
+    Example:
         ```python
-        train_data = np.array([[1, 2], [3, 4]])
-        sample_weights = [0.5, 0.5]
         validate_sample_weights(train_data, sample_weights)
-        # Passes validation
         ```
     """
     if (
         train_sample_weight is not None
-        and train_sample_weight.shape[0] != train_data.shape[0]
+        and len(train_sample_weight) != train_data.shape[0]
     ):
         raise ValueError(
             f"""
-            Sample weight array size ({train_sample_weight.shape[0]})
-            does not match the number
-            of training data points ({train_data.shape[0]})
+            Sample weights ({len(train_sample_weight)})
+            do not match data points ({train_data.shape[0]}).
             """
         )
 
 
 def execute_clustering(
-    container: ClusteringContainer,
+    clustering_algorithm: Union[CKMeans, CDBSCAN, CAgglomerativeClustering],
     train_data: ndarray,
-    train_sample_weight: ndarray,
+    train_sample_weight: Optional[ndarray],
 ) -> ndarray:
     """
-    Perform clustering using the specified algorithm.
-
-    This function validates the sample weights and
-    applies the clustering algorithm from
-    the provided container to the training data.
-    It returns the clustering results.
+    Apply a clustering algorithm to the training data.
 
     Args:
-        container (ClusteringContainer):
-        Container holding the clustering algorithm.
-        train_data (ndarray): Training data array.
-        train_sample_weight (ndarray): Sample weight array.
+        clustering_algorithm
+        (Union[CKMeans, CDBSCAN, CAgglomerativeClustering]):
+        Clustering algorithm instance.
+        train_data (ndarray): Data to cluster.
+        train_sample_weight (Optional[ndarray]): Sample weights.
 
     Returns:
         ndarray: Clustering results.
 
     Raises:
-        Exception: If an error occurs during clustering.
+        Exception: If clustering fails.
 
-    Example Usage:
+    Example:
         ```python
-        container = ClusteringContainer()
-        train_data = np.array([[1, 2], [3, 4]])
-        sample_weights = [0.5, 0.5]
-        result = execute_clustering(container, train_data, sample_weights)
-        print(result)  # Clustering result
+        result = execute_clustering(algorithm, train_data, sample_weights)
+        print(result)
         ```
     """
     try:
-        validate_sample_weights(train_data, train_sample_weight)
-
-        clustering_tool = container.clustering_algorithm()
-        result = clustering_tool.cluster(
-            train_data,
-            sample_weight=train_sample_weight,
+        tsw_converted: Optional[List[float]] = (
+            train_sample_weight.tolist()
+            if train_sample_weight is not None
+            else None
         )
-
-        return result
-
+        validate_sample_weights(train_data, tsw_converted)
+        return clustering_algorithm.cluster(
+            train_data, sample_weight=tsw_converted
+        )
     except Exception as e:
-        raise Exception(f"Error during clustering: {e}")
+        raise Exception(f"Clustering error: {e}")
 
 
 def save_results(
-    io_handler: IOHandler, result: Optional[ndarray], output_path: str
+    output_handler: Union[JSONHandler, NumpyHandler],
+    result: Optional[ndarray],
+    output_path: str,
 ) -> None:
     """
     Save clustering results to a specified file.
 
-    This function saves the clustering result to
-    the specified output file using the provided
-    IO handler. If no result is provided, the function does nothing.
-
     Args:
-        io_handler (IOHandler): Instance of an IO handler for data saving.
-        result (Optional[ndarray]): Clustering results to save.
-        output_path (str): Path to the output file.
+        output_handler (Union[JSONHandler, NumpyHandler]):
+        Handler to save data.
+        result (Optional[ndarray]): Clustering results.
+        output_path (str): Path to save the results.
 
-    Returns:
-        None: This function does not return any value.
-
-    Raises:
-        Exception: If there is an error saving the results.
-
-    Example Usage:
+    Example:
         ```python
-        io_handler = IOHandler()
-        result = np.array([0, 1, 1, 0])
-        save_results(io_handler, result, "output.json")
+        save_results(handler, result, "output.json")
         ```
     """
     try:
         if result is not None:
-            io_handler.save_data(result, output_path)
+            output_handler.save_data(result, output_path)
     except Exception as e:
         raise Exception(f"Error saving results: {e}")
