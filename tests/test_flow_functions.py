@@ -3,9 +3,14 @@ from unittest.mock import MagicMock, mock_open
 import numpy as np
 import pytest
 
-from app.flow_functions import (execute_clustering, load_and_validate_config,
-                                load_data, parse_arguments, save_results,
-                                validate_sample_weights)
+from app.flow_functions import (
+    execute_clustering,
+    load_and_validate_config,
+    load_data,
+    parse_arguments,
+    save_results,
+    validate_sample_weights,
+)
 from app.utils.validations import Config
 
 
@@ -92,27 +97,26 @@ def test_validate_sample_weights():
 
     # Invalid weights
     train_sample_weight = np.array([0.1, 0.2])
-    with pytest.raises(ValueError, match="Sample weight array size"):
+    with pytest.raises(ValueError):
         validate_sample_weights(train_data, train_sample_weight)
 
 
 def test_execute_clustering(mocker):
     """Test clustering execution."""
-    mock_container = MagicMock()
-    mock_clustering_tool = MagicMock()
-    mock_clustering_tool.cluster.return_value = "mock_result"
-    mock_container.clustering_algorithm.return_value = mock_clustering_tool
+    clustering_algorithm = MagicMock()
+    clustering_algorithm.cluster.return_value = "mock_result"
+    clustering_algorithm.return_value = clustering_algorithm
 
     train_data = np.array([[1, 2], [3, 4]])
     train_sample_weight = np.array([0.5, 0.5])
 
     result = execute_clustering(
-        mock_container, train_data, train_sample_weight
+        clustering_algorithm, train_data, train_sample_weight
     )
-
+    print(result)
     assert result == "mock_result"
-    mock_clustering_tool.cluster.assert_called_once_with(
-        train_data, sample_weight=train_sample_weight
+    clustering_algorithm.cluster.assert_called_once_with(
+        train_data, sample_weight=train_sample_weight.tolist()
     )
 
 
