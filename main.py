@@ -7,17 +7,23 @@ def main():
     try:
         args = parse_arguments()
         validated_config = load_and_validate_config(args.config)
+
         container = ClusteringContainer()
         container.config.from_dict(validated_config.model_dump(mode="json"))
-        io_handler = container.io_handler()
+
+        input_handler = container.input_handler()
+        output_handler = container.output_handler()
+        clustering_algorithm = container.clustering_algorithm()
 
         train_data, train_sample_weight = load_data(
-            io_handler, args.input, args.sample_weight
+            input_handler, args.input, args.sample_weight
         )
 
-        result = execute_clustering(container, train_data, train_sample_weight)
+        result = execute_clustering(
+            clustering_algorithm, train_data, train_sample_weight
+        )
 
-        save_results(io_handler, result, args.output)
+        save_results(output_handler, result, args.output)
     except Exception as e:
         print(e)
 
