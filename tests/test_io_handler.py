@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pytest
 
-from app.utils.io_handler import IOHandler, JSONHandler, NumpyHandler
+from app.utils.io_handler import JSONHandler, NumpyHandler
 
 
 @pytest.fixture
@@ -16,7 +16,8 @@ def sample_data():
 def json_file(tmp_path, sample_data):
     """Fixture for a temporary JSON file containing sample data."""
     filepath = tmp_path / "test.json"
-    JSONHandler.save(sample_data, str(filepath).replace(".json", ""))
+    json_io_handler = JSONHandler()
+    json_io_handler.save_data(sample_data, str(filepath))
     return filepath
 
 
@@ -24,65 +25,72 @@ def json_file(tmp_path, sample_data):
 def numpy_file(tmp_path, sample_data):
     """Fixture for a temporary NumPy file containing sample data."""
     filepath = tmp_path / "test.npy"
-    NumpyHandler.save(sample_data, str(filepath).replace(".npy", ""))
+    numpy_io_handler = NumpyHandler()
+    numpy_io_handler.save_data(sample_data, str(filepath))
     return filepath
 
 
 def test_json_handler_save_and_load(tmp_path, sample_data):
     """Test JSONHandler's save and load functionality."""
     filepath = tmp_path / "test.json"
+    json_io_handler = JSONHandler()
+
     # Test saving data
-    JSONHandler.save(sample_data, str(filepath).replace(".json", ""))
+    json_io_handler.save_data(sample_data, str(filepath))
     assert os.path.exists(filepath)
 
     # Test loading data
-    loaded_data = JSONHandler.load(str(filepath))
+    loaded_data = json_io_handler.load_data(str(filepath))
     assert np.array_equal(loaded_data, sample_data)
 
 
 def test_numpy_handler_save_and_load(tmp_path, sample_data):
     """Test NumpyHandler's save and load functionality."""
     filepath = tmp_path / "test.npy"
+    numpy_io_handler = NumpyHandler()
+
     # Test saving data
-    NumpyHandler.save(sample_data, str(filepath).replace(".npy", ""))
+    numpy_io_handler.save_data(sample_data, str(filepath))
     assert os.path.exists(filepath)
 
     # Test loading data
-    loaded_data = NumpyHandler.load(str(filepath))
+    loaded_data = numpy_io_handler.load_data(str(filepath))
     assert np.array_equal(loaded_data, sample_data)
 
 
 def test_io_handler_json_to_numpy(json_file, tmp_path):
     """Test IOHandler for loading from JSON and saving to NumPy."""
     output_path = tmp_path / "output.npy"
-    io_handler = IOHandler(JSONHandler, NumpyHandler)
+    json_io_handler = JSONHandler()
+    numpy_io_handler = NumpyHandler()
 
     # Load from JSON
-    data = io_handler.load_data(str(json_file))
+    data = json_io_handler.load_data(str(json_file))
     assert data is not None
 
     # Save to NumPy
-    io_handler.save_data(data, str(output_path).replace(".npy", ""))
+    numpy_io_handler.save_data(data, str(output_path))
     assert os.path.exists(output_path)
 
     # Verify the saved file
-    loaded_data = NumpyHandler.load(str(output_path))
+    loaded_data = numpy_io_handler.load_data(str(output_path))
     assert np.array_equal(loaded_data, data)
 
 
 def test_io_handler_numpy_to_json(numpy_file, tmp_path):
     """Test IOHandler for loading from NumPy and saving to JSON."""
     output_path = tmp_path / "output.json"
-    io_handler = IOHandler(NumpyHandler, JSONHandler)
+    numpy_io_handler = NumpyHandler()
+    json_io_handler = JSONHandler()
 
     # Load from NumPy
-    data = io_handler.load_data(str(numpy_file))
+    data = numpy_io_handler.load_data(str(numpy_file))
     assert data is not None
 
     # Save to JSON
-    io_handler.save_data(data, str(output_path).replace(".json", ""))
+    json_io_handler.save_data(data, str(output_path))
     assert os.path.exists(output_path)
 
     # Verify the saved file
-    loaded_data = JSONHandler.load(str(output_path))
+    loaded_data = json_io_handler.load_data(str(output_path))
     assert np.array_equal(loaded_data, data)
