@@ -3,14 +3,9 @@ from unittest.mock import MagicMock, mock_open
 import numpy as np
 import pytest
 
-from app.flow_functions import (
-    execute_clustering,
-    load_and_validate_config,
-    load_data,
-    parse_arguments,
-    save_results,
-    validate_sample_weights,
-)
+from app.flow_functions import (execute_clustering, load_and_validate_config,
+                                load_data, parse_arguments, save_results,
+                                validate_sample_weights)
 from app.utils.validations import Config
 
 

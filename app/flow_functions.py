@@ -45,7 +45,13 @@ def load_and_validate_config(config_path: str) -> Config:
         Config: Validated configuration object.
 
     Raises:
-        ValidationError: If the configuration is invalid.
+        ValueError:
+        If the YAML file cannot be parsed or if the configuration is invalid.
+        FileNotFoundError:
+        If the configuration file does not exist.
+        Exception:
+        For unexpected errors during the configuration loading process.
+
 
     Example:
         ```python
@@ -57,8 +63,14 @@ def load_and_validate_config(config_path: str) -> Config:
         with open(config_path, "r") as file:
             raw_config = yaml.safe_load(file)
         return Config(**raw_config)
+    except yaml.YAMLError as e:
+        raise ValueError(f"Error parsing YAML file: {e}")
     except ValidationError as e:
-        raise ValidationError(f"Invalid configuration: {e}")
+        raise ValueError(f"Invalid configuration: {e}")
+    except FileNotFoundError:
+        raise ValueError(f"Configuration file not found: {config_path}")
+    except Exception as e:
+        raise Exception(f"Unexpected error occurs: {e}")
 
 
 def load_data(
@@ -77,6 +89,15 @@ def load_data(
     Returns:
         tuple: Loaded training data and sample weights.
 
+    Raises:
+        FileNotFoundError:
+        If the input file or optional sample weight file does not exist.
+        ValueError:
+        If the input data or sample weights are
+        invalid or improperly formatted.
+        Exception:
+        For any other unexpected errors during data loading.
+
     Example:
         ```python
         train_data, weights = load_data(handler, "data.json", "weights.json")
@@ -90,8 +111,21 @@ def load_data(
             else None
         )
         return train_data, train_sample_weight
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f"Input file: {input_path}."
+            f"{
+                f"Sample weight file: {sample_weight_path}."
+                if sample_weight_path else ""
+            } "
+            f"Ensure the path is correct."
+        ) from e
+    except (ValueError, TypeError) as e:
+        raise ValueError(
+            f"Error parsing data from file: {e}. Verify the file format."
+        ) from e
     except Exception as e:
-        raise Exception(f"Error loading data: {e}")
+        raise Exception(f"Unexpected error loading data: {e}") from e
 
 
 def validate_sample_weights(
@@ -105,23 +139,28 @@ def validate_sample_weights(
         train_sample_weight (Optional[List[float]]): Sample weights.
 
     Raises:
-        ValueError: If weights and data points mismatch.
+        ValueError:
+        If the number of sample weights
+        does not match the number of data points.
+
 
     Example:
         ```python
         validate_sample_weights(train_data, sample_weights)
         ```
     """
-    if (
-        train_sample_weight is not None
-        and len(train_sample_weight) != train_data.shape[0]
-    ):
-        raise ValueError(
-            f"""
-            Sample weights ({len(train_sample_weight)})
-            do not match data points ({train_data.shape[0]}).
-            """
-        )
+    if train_sample_weight is not None:
+        num_data_points = train_data.shape[0]
+        num_weights = len(train_sample_weight)
+
+        if num_weights != num_data_points:
+            raise ValueError(
+                f"Sample weights mismatch: "
+                f"Expected {num_data_points} data points, "
+                f"but found {num_weights} sample weights. "
+                f"Please ensure the number of "
+                f"weights matches the number of data points."
+            )
 
 
 def execute_clustering(
@@ -143,7 +182,15 @@ def execute_clustering(
         ndarray: Clustering results.
 
     Raises:
-        Exception: If clustering fails.
+        TypeError:
+        If the sample weights cannot be converted to a list.
+        ValueError:
+        If the sample weights fail validation or mismatch the data shape.
+        RuntimeError:
+        If the clustering algorithm encounters an internal error.
+        Exception:
+        For any other unexpected errors during clustering.
+
 
     Example:
         ```python
@@ -161,8 +208,23 @@ def execute_clustering(
         return clustering_algorithm.cluster(
             train_data, sample_weight=tsw_converted
         )
+    except TypeError as e:
+        raise TypeError(
+            f"Failed to convert sample weights to list: {e}. "
+            f"Ensure sample weights are a valid ndarray."
+        ) from e
+    except ValueError as e:
+        raise ValueError(
+            f"Sample weights validation error: {e}. "
+            f"Check if weights match the data shape."
+        ) from e
+    except RuntimeError as e:
+        raise RuntimeError(
+            f"Clustering algorithm error: {e}. "
+            f"Ensure the algorithm is configured correctly."
+        ) from e
     except Exception as e:
-        raise Exception(f"Clustering error: {e}")
+        raise Exception(f"Unexpected clustering error: {e}") from e
 
 
 def save_results(
@@ -179,13 +241,38 @@ def save_results(
         result (Optional[ndarray]): Clustering results.
         output_path (str): Path to save the results.
 
+    Raises:
+        FileNotFoundError:
+        If the output directory does not exist.
+        IOError:
+        If there is an I/O error while saving the results.
+        ValueError:
+        If the result is None or invalid for saving.
+        Exception:
+        For any other unexpected errors during result saving.
+
     Example:
         ```python
         save_results(handler, result, "output.json")
         ```
     """
     try:
-        if result is not None:
-            output_handler.save_data(result, output_path)
+        if result is None:
+            raise ValueError("Result is None. Cannot save empty results.")
+
+        output_handler.save_data(result, output_path)
+
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f"Output path '{output_path}' not found: {e}. "
+            f"Check the directory and permissions."
+        ) from e
+    except IOError as e:
+        raise IOError(
+            f"I/O error while saving results to '{output_path}': {e}. "
+            f"Ensure the path is writable."
+        ) from e
+    except ValueError as e:
+        raise e
     except Exception as e:
-        raise Exception(f"Error saving results: {e}")
+        raise Exception(f"Unexpected error while saving results: {e}") from e
